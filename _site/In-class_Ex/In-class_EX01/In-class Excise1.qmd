@@ -1,0 +1,42 @@
+---
+title: "In-class Exercise01"
+author: "HuYu"
+date: "Aug 20 2024"
+date-modified: "last-modified"
+execute: 
+  eval: true
+  echo: true
+  message: false
+  freeze: true
+---
+```{r}
+pacman::p_load(sf, tidyverse, tmap, ggstatsplot)
+```
+
+```{r}
+mpsz14_shp = st_read(dsn = "/Users/yuhu/ISSS626_GAA/_site/In-class_Ex/In-class_EX01/data/geospatial", 
+                  layer = "MP14_SUBZONE_WEB_PL")
+```
+
+```{r}
+st_write(mpsz14_shp,
+         "data/geospatial/MP14_SUBZONE_WEB_PL.kml",
+         delete_dsn = TRUE)
+```
+
+```{r}
+mpsz19_shp = st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/MPSZ-2019/", 
+                  layer = "MPSZ-2019")
+```
+
+```{r}
+mpsz1 = st_read(dsn = "/Users/yuhu/ISSS626_GAA/_site/In-class_Ex/In-class_EX01/data/geospatial", 
+                         layer = "MasterPlan2019SubzoneBoundaryNoSeaKML.kml")
+```
+
+```{r}
+mpsz19_shp <- st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/MPSZ-2019/",
+layer = "MPSZ-2019") %>%
+st_trasform(crs =3414)
+```
+
