@@ -1,0 +1,19 @@
+---
+title: "Take-home Exercise 1"
+author: "Hu Yu"
+Date: "September 9,2024""
+Data-modified:"Last-modified"
+Execute:
+  eval: true
+  echo: true
+  freeze: true
+  warning: false
+---
+
+```{r}
+pacman::p_load(sf, tidyverse, tmap, spnetwork)
+```
+
+```{r}
+acc <- read_csv()
+```
