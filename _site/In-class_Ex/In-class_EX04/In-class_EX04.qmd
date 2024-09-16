@@ -1,0 +1,68 @@
+---
+title: "In_class_Ex04"
+author: "huyu"
+---
+
+```{r}
+pacman::p_load(sf, spdep, tmap, tidyverse, knitr, ggstatsplot, GWmodel)
+```
+
+```{r}
+hunan <- st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/Hands-on Ex04/ISSS626-G1-Geospatial Analytics and Applications - 9162024 - 404 PM/data/geospatial", 
+                 layer = "Hunan")
+```
+
+```{r}
+hunan2012 <- read_csv("/Users/yuhu/Desktop/Geospatial Analytics and Applications/Hands-on Ex04/ISSS626-G1-Geospatial Analytics and Applications - 9162024 - 404 PM/data/aspatial/Hunan_2012.csv")
+```
+
+```{r}
+hunan_sf <- left_join(hunan,hunan2012)%>%
+  select(1:3, 7, 15, 16, 31, 32)
+```
+
+```{r}
+hunan_sp <-hunan_sf %>%
+  as_Spatial()
+```
+
+```{r}
+bw_CV <- bw.gwr(GDPPC ~ 1,
+                data = hunan_sp,
+                approach = "CV",###AIC
+                adaptive = TRUE,
+              kernel = "bisquare",
+              longlat = T)
+```
+
+```{r}
+gwstat <- gwss(data = hunan_sp,
+               vars = "GDPPC",
+               bw = bw_CV, ###bw_AIC
+               kernel = "bisquare",
+               adaptive = TRUE,
+               longlat = T)
+```
+
+```{r}
+gwstat_df <- as.data.frame(gwstat$SDF)
+```
+
+```{r}
+hunan_gstat <-cbind(hunan_sf, gwstat_df)
+```
+
+```{r}
+tm_shape(hunan_gstat) +
+  tm_fill("GDPPC_LM",
+          n = 5,
+          style = "quantile") + 
+  tm_borders(alpha = 0.5) +
+  tm_layout(main.title = "Distribution of geopraphically weighted mean",
+            main.title.position = "center",
+            main.title.size = 2.0,
+            legend.text.size = 0.8,
+            legend.height = 0.50,
+            legend.width = 0.80,
+            frame = TRUE)
+```
