@@ -1,0 +1,600 @@
+---
+title: "Take_Home_EX01"
+author: "HuYu"
+---
+
+```{r}
+pacman::p_load(sf, tidyverse, tmap, spNetwork,spatstat)
+```
+
+```{r}
+acc <- read.csv('/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01/thai_road_accident_2019_2022.csv') %>%
+  # Remove rows with missing longitude or latitude
+  filter(!is.na(longitude) & !is.na(latitude)) %>%
+  
+  # Create new columns for month and day of the week
+  mutate(Month_num = month(incident_datetime)) %>%
+  mutate(Month_fac = month(incident_datetime, label = TRUE, abbr = TRUE)) %>%
+  mutate(dayofweek = day(incident_datetime)) %>%
+  
+  # Convert the data frame to a spatial sf object
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  
+  # Transform to a different CRS (Coordinate Reference System)
+  st_transform(crs = 32647)
+```
+
+```{r}
+write_rds(acc, "/Users/yuhu/Desktop/Geospatial Analytics and Applications/Hands-on Ex01/Data/rds/acc.rds")
+```
+
+```{r}
+acc <- read_rds("/Users/yuhu/Desktop/Geospatial Analytics and Applications/Hands-on Ex01/Data/rds/acc.rds")
+```
+
+```{r}
+
+# 读取道路数据并赋值给 Thailand_Road
+Thailand_Road <- st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01", 
+                         layer = "hotosm_tha_roads_lines_shp")
+
+# Check if CRS is missing and assign EPSG:4326 (WGS 84) if needed
+if (is.na(st_crs(Thailand_Road))) {
+  Thailand_Road <- st_set_crs(Thailand_Road, 4326)  # Assign CRS WGS 84 (EPSG:4326)
+}
+
+# Now transform the data to EPSG:32647 (UTM Zone 47N)
+Thailand_Road <- st_transform(Thailand_Road, crs = 32647)
+
+# You can now continue working with Thailand_Road_Transformed for further geospatial analysis.
+
+```
+
+```{r}
+admin1 <- st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01", 
+                  layer = "tha_admbnda_adm1_rtsd_20220121")
+```
+
+```{r}
+
+# 筛选特定的区域
+BMR_map <- admin1 %>%
+  filter(ADM1_EN %in% c("Bangkok", "Nakhon Pathom", "Pathum Thani", 
+                        "Nonthaburi", "Samut Prakan", "Samut Sakhon"))
+
+acc1 <- acc %>%
+  filter(province_en %in% c("Bangkok", "Nakhon Pathom", "Pathum Thani", 
+                        "Nonthaburi", "Samut Prakan", "Samut Sakhon"))
+
+
+```
+
+```{r}
+# Load necessary packages
+pacman::p_load(sf, sp, spatstat.geom, spatstat.core)
+
+# Step 1: Convert sf object to sp using as_Spatial
+acc_sp <- as_Spatial(acc1)  # Correct function for converting sf to Spatial*
+
+# Step 2: Check and remove duplicated points if needed
+acc_sp_unique <- acc_sp[!duplicated(coordinates(acc_sp)), ]
+
+# Step 3: Define the bounding box
+bbox <- bbox(acc_sp_unique)
+window <- owin(xrange = bbox[1, ], yrange = bbox[2, ])
+
+# Step 4: Convert the SpatialPointsDataFrame to a ppp object (point pattern)
+acc_coords <- coordinates(acc_sp_unique)
+acc_ppp <- as.ppp(acc_coords, W = window)
+
+# Step 5: Plot the ppp object
+plot(acc_ppp, main = "Accident Points", cols = "red", pch = 16, cex = 0.6)
+
+
+
+```
+
+```{r}
+
+# Load necessary libraries
+pacman::p_load(sf, sp, maptools, spatstat.geom)
+
+# Step 1: Filter the Bangkok region (already done in your code)
+BMR_map <- admin1 %>%
+  filter(ADM1_EN %in% c("Bangkok", "Nakhon Pathom", "Pathum Thani", 
+                        "Nonthaburi", "Samut Prakan", "Samut Sakhon"))
+
+# Step 2: Reproject the sf object to a projected CRS (UTM Zone 47N for Thailand)
+# UTM Zone 47N has the EPSG code 32647
+BMR_projected <- st_transform(BMR_map, crs = 32647)
+
+# Step 3: Convert the sf object (BMR_projected) to a SpatialPolygon object
+BMR_sp <- as_Spatial(BMR_projected)
+
+# Step 4: Convert the SpatialPolygon to an owin object
+BMR_owin <- as.owin(BMR_sp)
+
+# Step 5: Plot the owin object
+plot(BMR_owin, main = "BMR (6 Areas)")
+
+
+
+
+
+```
+
+```{r}
+BMR_projected <- st_transform(BMR_map, crs = 32647)
+
+# Step 3: Convert the sf object to a SpatialPolygon object
+BMR_sp <- as_Spatial(BMR_projected)
+
+# Step 4: Convert the SpatialPolygon to an owin object (for spatstat)
+BMR_owin <- as.owin(BMR_sp)
+
+# Step 5: Initialize a new plotting window
+plot.new()
+
+# Step 6: Plot the BMR region - this initiates the plot window
+plot(BMR_owin, main = "")
+
+# Step 7: Define the bounding box for accident points
+bbox <- bbox(acc_sp_unique)
+window <- owin(xrange = bbox[1, ], yrange = bbox[2, ])
+
+# Step 8: Convert the accident data to ppp object (point pattern)
+acc_coords <- coordinates(acc_sp_unique)
+acc_ppp <- as.ppp(acc_coords, W = window)
+
+# Step 9: Overlay the accident points on top of the BMR map
+plot(acc_ppp, add = TRUE, col = "red", pch = 16, cex = 0.6)
+
+# Optional: Add title and labels with space adjustments
+title(main = "Accident Points in Bangkok Metropolitan Region (BMR)", line = 2, cex.main = 1.5)
+```
+
+```{r}
+# Load necessary packages
+pacman::p_load(sf, sp, spatstat.geom, spatstat.core)
+
+# Step 1: Convert sf object to sp using as_Spatial
+acc_sp <- as_Spatial(acc1)  # Correct function for converting sf to Spatial*
+
+# Step 2: Check and remove duplicated points if needed
+acc_sp_unique <- acc_sp[!duplicated(coordinates(acc_sp)), ]
+
+# Step 3: Define the bounding box
+bbox <- bbox(acc_sp_unique)
+window <- owin(xrange = bbox[1, ], yrange = bbox[2, ])
+
+# Step 4: Convert the SpatialPointsDataFrame to a ppp object (point pattern)
+acc_coords <- coordinates(acc_sp_unique)
+acc_ppp <- as.ppp(acc_coords, W = window)
+
+# Step 5: Plot the ppp object
+plot(acc_ppp, main = "Accident Points", cols = "red", pch = 16, cex = 0.6)
+
+# Load necessary libraries
+pacman::p_load(sf, sp, maptools, spatstat.geom)
+
+# Step 6: Filter and reproject BMR region
+BMR_map <- admin1 %>%
+  filter(ADM1_EN %in% c("Bangkok", "Nakhon Pathom", "Pathum Thani", 
+                        "Nonthaburi", "Samut Prakan", "Samut Sakhon"))
+
+BMR_projected <- st_transform(BMR_map, crs = 32647)
+
+# Step 7: Convert BMR sf object to a SpatialPolygon object
+BMR_sp <- as_Spatial(BMR_projected)
+
+# Step 8: Convert the SpatialPolygon to an owin object (for spatstat)
+BMR_owin <- as.owin(BMR_sp)
+
+# Step 9: Initialize a new plotting window
+plot.new()
+
+# Step 10: Plot the BMR region - this initiates the plot window
+plot(BMR_owin, main = "")
+
+# Step 11: Define the bounding box for accident points and convert to ppp
+bbox <- bbox(acc_sp_unique)
+window <- owin(xrange = bbox[1, ], yrange = bbox[2, ])
+acc_coords <- coordinates(acc_sp_unique)
+acc_ppp <- as.ppp(acc_coords, W = window)
+
+# Step 12: Overlay the accident points on top of the BMR map
+plot(acc_ppp, add = TRUE, col = "red", pch = 16, cex = 0.6)
+
+# Optional: Add title and labels with space adjustments
+title(main = "Accident Points in Bangkok Metropolitan Region (BMR)", line = 2, cex.main = 1.5)
+
+## ---------------- KDE 部分开始 ----------------
+
+# Step 13: 计算核密度估计（使用自动带宽选择 bw.diggle）
+kde_acc <- density(acc_ppp, 
+                   sigma = bw.diggle(acc_ppp),  # 自动带宽选择
+                   edge = TRUE, 
+                   kernel = "gaussian")
+
+# Step 14: 创建蓝色底色的自定义配色方案
+blue_palette <- colorRampPalette(c("blue", "yellow", "white"))  # 从蓝到黄再到白的渐变
+
+# Step 15: 绘制核密度估计结果，使用蓝色底色
+plot(kde_acc, main = "Kernel Density Estimation of Accident Data in BMR", col = blue_palette(100))
+
+# Step 16: 在 KDE 图上叠加 BMR 边界
+plot(BMR_owin, add = TRUE, border = "black", lwd = 2)
+
+
+## ---------------- KDE 部分结束 ----------------
+
+
+
+```
+
+```{r}
+# Step 16: 固定带宽的核密度估计，带宽为 600 米 (即 0.6 千米)
+kde_acc_fixed <- density(acc_ppp, 
+                         sigma = 0.6,  # 固定带宽，单位为千米
+                         edge = TRUE, 
+                         kernel = "gaussian")
+
+# Step 17: 绘制固定带宽的核密度估计结果
+plot(kde_acc_fixed, main = "Kernel Density Estimation (Fixed Bandwidth)")
+plot(BMR_owin, add = TRUE, border = "black", lwd = 2)
+
+# Step 18: 自适应带宽核密度估计
+kde_acc_adaptive <- adaptive.density(acc_ppp, method = "kernel")
+
+# Step 19: 绘制自适应带宽的核密度估计结果
+plot(kde_acc_adaptive, main = "Kernel Density Estimation (Adaptive Bandwidth)")
+plot(BMR_owin, add = TRUE, border = "black", lwd = 2)
+
+# Step 20: 比较固定带宽和自适应带宽的 KDE 结果
+par(mfrow = c(1, 2))  # 将图形窗口分为 1 行 2 列
+plot(kde_acc_fixed, main = "Fixed Bandwidth KDE")
+plot(kde_acc_adaptive, main = "Adaptive Bandwidth KDE")
+
+# Step 21: 将固定带宽的 KDE 转换为 SpatialGridDataFrame
+gridded_kde_acc_fixed <- as.SpatialGridDataFrame.im(kde_acc_fixed)
+spplot(gridded_kde_acc_fixed)
+
+# Step 22: 将自适应带宽的 KDE 转换为 SpatialGridDataFrame
+gridded_kde_acc_adaptive <- as.SpatialGridDataFrame.im(kde_acc_adaptive)
+spplot(gridded_kde_acc_adaptive)
+
+# Step 23: 将固定带宽的 KDE 转换为栅格对象
+kde_acc_fixed_raster <- raster(kde_acc_fixed)
+
+# Step 24: 为 RasterLayer 对象设置投影系统
+projection(kde_acc_fixed_raster) <- CRS("+init=EPSG:32647")
+
+# Step 25: 可视化固定带宽的栅格数据
+tm_shape(kde_acc_fixed_raster) +
+  tm_raster("layer", palette = "viridis") +
+  tm_layout(legend.position = c("right", "bottom"), frame = FALSE)
+
+```
+
+```{r}
+# 安装并加载 spatstat 包（如果尚未安装）
+if (!requireNamespace("spatstat", quietly = TRUE)) {
+  install.packages("spatstat")
+}
+
+library(spatstat)
+
+# 继续使用你已有的道路数据和事故数据进行核密度估计
+
+# Step 1: 计算核密度估计，使用 quartic 核
+kde_acc <- density(acc_ppp, 
+                   sigma = bw.diggle(acc_ppp),  # 使用自动选择的带宽
+                   edge = TRUE, 
+                   kernel = "quartic")
+
+# Step 2: 绘制核密度估计图
+plot(kde_acc, main = "Kernel Density Estimation of BMR Accident Data")
+plot(BMR_owin, add = TRUE, border = "black", lwd = 2)
+
+
+```
+
+```{r}
+# 加载必要的 R 包
+pacman::p_load(sf, dplyr)
+admin_boundaries <- st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01",
+                        layer = "tha_admbnda_adm1_rtsd_20220121")
+```
+
+
+### 3.3.4 选出bmr的1级行政划分
+
+
+```{r}
+#| eval: false
+bmr_provinces <- c("Bangkok", "Nakhon Pathom", "Pathum Thani", "Nonthaburi", "Samut Prakan", "Samut Sakhon")
+
+bmr_boundary <- admin_boundaries %>%
+  filter(ADM1_EN %in% bmr_provinces)
+```
+
+```{r}
+#| eval: false
+write_rds(bmr_boundary, "/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01/bmr_boundary.rds")
+```
+
+```{r}
+roads <- st_read(dsn = "/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01/",
+                        layer = "hotosm_tha_roads_lines_shp")
+bmr_boundary <- read_rds("/Users/yuhu/Desktop/Geospatial Analytics and Applications/TakeHome_EX01/bmr_boundary.rds")
+head(bmr_boundary)
+
+# 获取 Bangkok 的边界
+# 假设 bmr_boundary 是一个 sf 对象，包含多个省份的边界
+# 你需要根据 bmr_boundary 里的某个列来筛选 Bangkok 的边界，比如 ADM1_EN 列
+
+# 筛选出 Bangkok 的边界
+bangkok_boundary <- bmr_boundary %>%
+  filter(ADM1_EN == "Bangkok")
+
+# 为缺失 CRS 的对象设置 WGS 84 投影
+roads <- st_set_crs(roads, 4326)
+
+# 为 bmr_boundary 设置 WGS 84 投影（如果缺失）
+bmr_boundary <- st_set_crs(bmr_boundary, 4326)
+
+
+# Step 3: 进行空间相交，获取与边界相交的道路数据
+# 对 Bangkok 进行空间相交，获取 Bangkok 区域内的道路
+bangkok_roads_intersection <- st_intersection(bangkok_roads, bangkok_boundary)
+
+# Step 4: 查看结果
+print(bangkok_roads_intersection)
+
+# 可视化相交后的结果
+# 需要加载 ggplot2 或 tmap 进行简单的可视化
+```
+
+```{r}
+main_rd <- roads %>%
+  filter(highway %in% c("motorway", "trunk", "primary", "secondary"))
+```
+
+```{r}
+##NKDE analysis
+#transfer to linestring
+# 过滤出 LINESTRING 和 MULTILINESTRING 类型的几何对象
+main_bangkok_roads <- roads %>%
+  filter(st_geometry_type(roads) %in% c("LINESTRING", "MULTILINESTRING"))
+
+# 将 MULTILINESTRING 转换为多个 LINESTRING，保留所有线段
+main_bangkok_roads <- st_cast(main_bangkok_roads, "LINESTRING", group_or_split = TRUE)
+
+# 检查转换成功与否，应该显示为 LINESTRING
+st_geometry_type(main_bangkok_roads)
+```
+
+```{r}
+#generate lixels
+lixels_bangkok <- lixelize_lines(main_bangkok_roads,
+                         10000,        # 5000 米的 lixel 单元
+                         mindist = 5000)  # 最小距离设置为 5000 米
+
+# 使用 lines_center 生成样本点，取每个 lixel 的中心点
+samples_bangkok <- lines_center(lixels_bangkok)
+
+#perform NKDE
+acc_bangkok<- acc1 %>%
+  filter(province_en %in% "Bangkok")
+
+
+# Step 2: Generate lixels, ensuring the road network is projected
+lixels_bangkok <- lixelize_lines(main_bangkok_roads_projected,
+                                 10000,        # 10,000 meters for lixel units
+                                 mindist = 5000)  # Minimum distance 5000 meters
+
+# Step 3: Generate sample points, use the center of each lixel
+samples_bangkok <- lines_center(lixels_bangkok)
+
+# Step 4: Ensure accident data is projected to UTM 47N (EPSG: 32647)
+bangkok_acc_projected <- st_transform(bangkok_acc, crs = 32647)
+
+# Step 5: Perform NKDE, ensuring all inputs are projected to UTM
+nkde_result_bangkok <- nkde(
+  lines = lixels_bangkok,                      # Lixels for Bangkok
+  events = bangkok_acc_projected,              # Projected accident data
+  w = rep(1, nrow(bangkok_acc_projected)),     # Weights
+  samples = samples_bangkok,                   # Sample points from lixels
+  kernel_name = "quartic",                     # Quartic kernel
+  bw = 500,                                    # Bandwidth 500 meters
+  div = "bw",                                  # Bandwidth standardization
+  method = "simple",                           # Simple method
+  grid_shape = c(200, 200),                    # Grid shape
+  verbose = TRUE                               # Print detailed info
+)
+
+```
+
+# Spatio-Temporal Point Patterns Analysis
+
+```{r}
+# 6.Spatio-Temporal Point Patterns Analysis
+
+## 6.1 Data Processing
+
+bmr_boundary_projected <- st_transform(bmr_boundary, 32647)
+
+st_crs(bmr_boundary_projected)
+
+```
+
+```{r}
+bmr_boundary_owin <- as.owin(bmr_boundary_projected)
+
+print(bmr_boundary_owin)
+
+```
+
+
+This step converts the boundary data of the Bangkok Metropolitan Region (BMR) into a projected coordinate reference system, specifically UTM Zone 47N (EPSG: 32647), which is commonly used for spatial analysis in Thailand. 
+
+## 6.2 Heatmap Analysis
+
+
+```{r, cache=TRUE}
+bmr_acc_data_projected <- st_transform(acc1, 32647)
+
+acc_coords <- st_coordinates(bmr_acc_data_projected)
+
+acc_ppp <- ppp(x = acc_coords[, 1], y = acc_coords[, 2], window = bmr_boundary_owin)
+
+spatial_density <- density(acc_ppp)
+
+plot(spatial_density)
+```
+
+
+This spatial density map highlights a central hotspot where the density is significantly higher, as shown by the yellow and pink areas. The density decreases gradually towards the edges, shifting to blue, indicating lower concentrations. The eastern part of the region shows higher density compared to the west and north, which have lower density values. This suggests that the central and eastern areas experience a higher frequency of the phenomenon being measured, making them key regions for further investigation or intervention.
+
+## 6.3 Visuaising geographic distribution of car accident by month
+
+
+```{r, cache=TRUE}
+tmap_mode("plot")
+
+monthly_map <- tm_shape(bmr_boundary) +
+  tm_borders() +                          
+  tm_shape(acc1) +                
+  tm_dots() +                             
+  tm_facets(by = "Month_fac", ncol = 4) +  
+  tm_layout(panel.labels = unique(acc1$Month_fac))  
+
+print(monthly_map)
+```
+
+```{r, cache=TRUE}
+# Ensure required libraries are loade
+
+# Create the ggplot map with facets for each month
+ggplot(data = acc1) +
+  geom_sf(data = bmr_boundary, fill = "gray80", color = "black", size = 0.5) +  # Plot boundary
+  geom_sf(aes(geometry = geometry), color = "red", size = 0.5, alpha = 0.7) +  # Red points for accidents
+  facet_wrap(~ Month_fac, ncol = 4) +                                          # Facets by month
+  theme_minimal() +                                                            # Minimal theme
+  labs(
+    title = "Monthly Geographic Distribution of Car Accidents",
+    x = "Longitude", y = "Latitude"
+  ) +
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),   # Adjust facet labels
+    plot.title = element_text(hjust = 0.5, size = 16),     # Center and adjust title
+    panel.grid.major = element_blank(),                   # Remove major gridlines
+    panel.grid.minor = element_blank()                    # Remove minor gridlines
+  )
+
+```
+
+
+```{r，cache=TRUE}
+## 6.4 Visuaising geographic distribution of car accident by week
+
+### 6.4.1 Data Processing
+bmr_acc_data_time <- acc1 %>%
+  mutate(incident_datetime = ymd_hms(incident_datetime))
+
+bmr_acc_data_time <- bmr_acc_data_time %>%
+  mutate(time_period = case_when(
+    hour(incident_datetime) >= 5 & hour(incident_datetime) < 10 ~ "5-9",
+    hour(incident_datetime) >= 10 & hour(incident_datetime) < 17 ~ "10-16",
+    hour(incident_datetime) >= 17 & hour(incident_datetime) < 21 ~ "17-20",
+    (hour(incident_datetime) >= 21 & hour(incident_datetime) <= 23) | (hour(incident_datetime) >= 0 & hour(incident_datetime) < 5) ~ "21-4"
+  ))
+
+head(bmr_acc_data_time)
+```
+
+
+```{r, cache=TRUE}
+bmr_acc_data_time_week <- bmr_acc_data_time %>%
+  mutate(week_category = case_when(
+    dayofweek %in% c("星期一", "星期二", "星期三", "星期四", "星期五") ~ "weekday",
+    dayofweek %in% c("星期六", "星期日") ~ "weekend"
+  ))
+
+head(bmr_acc_data_time_week)
+```
+
+
+This step categorizes road accident data based on the time of day and the day of the week. Accidents are grouped into four time periods (5-9, 10-16, 17-20, and 21-4) based on the hour of occurrence, and further classified into "weekday" and "weekend" based on the day of the week. This allows for analysis of accident patterns in relation to specific time periods and days, providing insights into temporal trends in road accidents.
+
+```
+
+```{r}
+### 6.4.2 Visualizing weekday vs. weekend traffic accident data
+bmr_acc_data_time_week <- bmr_acc_data_time_week %>%
+  mutate(incident_datetime = ymd_hms(incident_datetime))
+
+bmr_acc_data_time_week <- bmr_acc_data_time_week %>%
+  mutate(time_period = case_when(
+    hour(incident_datetime) >= 5 & hour(incident_datetime) < 10 ~ "morning rush hour",
+    hour(incident_datetime) >= 10 & hour(incident_datetime) < 17 ~ "off-peak hours",
+    hour(incident_datetime) >= 17 & hour(incident_datetime) < 21 ~ "evening rush hour",
+    (hour(incident_datetime) >= 21 & hour(incident_datetime) <= 23) | (hour(incident_datetime) >= 0 & hour(incident_datetime) < 5) ~ "night"
+  ),
+
+  time_period = factor(time_period, levels = c("night", "morning rush hour", "off-peak hours", "evening rush hour"))
+  )
+
+bmr_acc_data_time_weekday <- bmr_acc_data_time_week %>%
+  filter(week_category == "weekday")
+
+tmap_mode("plot")
+
+map <- tm_shape(bmr_boundary) +
+  tm_borders(lwd = 2, col = "black") +  
+  tm_shape(bmr_acc_data_time_weekday) +
+  tm_dots(size = 0.1, col = "red") +  
+  tm_facets(by = "time_period", nrow = 2, ncol = 2) +  
+  tm_layout(title = "Weekday Accident Distribution by Time Period", title.size = 1.2)
+
+print(map)
+
+
+```
+
+uring rush hours, both in the morning and evening, accidents are highly concentrated along major roads, reflecting the impact of heavy traffic on accident frequency. In contrast, off-peak hours and nighttime have fewer accidents, with a more dispersed pattern, suggesting that although traffic volume decreases, accidents still occur, potentially due to different driving behaviors during these times.
+```
+
+```{r, cache=TRUE}
+### 6.4.3 Visualizing traffic accident data for different periods of the week
+bmr_acc_data_time_week <- bmr_acc_data_time_week %>%
+  mutate(incident_datetime = ymd_hms(incident_datetime))
+
+bmr_acc_data_time_week <- bmr_acc_data_time_week %>%
+  mutate(time_period = case_when(
+    hour(incident_datetime) >= 5 & hour(incident_datetime) < 10 ~ "morning rush hour",
+    hour(incident_datetime) >= 10 & hour(incident_datetime) < 17 ~ "off-peak hours",
+    hour(incident_datetime) >= 17 & hour(incident_datetime) < 21 ~ "evening rush hour",
+    (hour(incident_datetime) >= 21 & hour(incident_datetime) <= 23) | (hour(incident_datetime) >= 0 & hour(incident_datetime) < 5) ~ "night"
+  ),
+  time_period = factor(time_period, levels = c("night", "morning rush hour", "off-peak hours", "evening rush hour"))
+  )
+
+bmr_acc_data_time_weekend <- bmr_acc_data_time_week %>%
+  filter(week_category == "weekend")
+
+tmap_mode("plot")
+
+
+map_weekend <- tm_shape(bmr_boundary) +
+  tm_borders(lwd = 2, col = "black") +  
+  tm_shape(bmr_acc_data_time_weekend) +
+  tm_dots(size = 0.1, col = "red") +  
+  tm_facets(by = "time_period", nrow = 2, ncol = 2) +  
+  tm_layout(title = "Weekend Accident Distribution by Time Period", title.size = 1.2)
+
+print(map_weekend)
+```
+
+
+
