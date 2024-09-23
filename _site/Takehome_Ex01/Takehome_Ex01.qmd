@@ -15,5 +15,52 @@ pacman::p_load(sf, tidyverse, tmap, spnetwork)
 ```
 
 ```{r}
-acc <- read_csv()
+bmr_acc_data <- readRDS("data/bmr_acc_data.rds")
+bmr_boundary <- readRDS("data/bmr_boundary.rds")
+bmr_roads <- readRDS("data/bmr_roads.rds")
+
+# Check the CRS of each dataset
+
+cat("BMR Accident Data CRS:\n")
+print(st_crs(bmr_acc_data))
+
+cat("BMR Boundary CRS:\n")
+print(st_crs(bmr_boundary))
+
+cat("BMR Roads CRS:\n")
+print(st_crs(bmr_roads))
+
+
+Transform the accident data and BMR accident data to EPSG:32647
+# Transform BMR accident data and BMR boundary to EPSG:32647 (UTM Zone 47N)
+bmr_acc_data <- st_transform(bmr_acc_data, crs = 32647)
+bmr_boundary <- st_transform(bmr_boundary, crs = 32647)
+
+# Check CRS to ensure correct projection
+cat("BMR Accident Data CRS:\n")
+print(st_crs(bmr_acc_data))
+
+cat("BMR Boundary CRS:\n")
+print(st_crs(bmr_boundary))
+
+Perform KDE on BMR Accident Data
+
+# Load necessary libraries
+library(sf)
+library(tmap)
+
+# Base R plot (Simple)
+plot(st_geometry(bmr_boundary), col = "lightgrey", border = "black", main = "BMR Accident Locations (Base R)")
+
+# Add the accident points on top of the boundary map with smaller dots
+plot(st_geometry(bmr_acc_data), col = "black", pch = 19, cex = 0.5, add = TRUE)  # Adjust point size using cex
+
+# tmap version (More flexible visualization)
+tm_shape(bmr_boundary) +
+  tm_borders(col = "black", lwd = 1) +  # Plot boundary with black borders
+  tm_shape(bmr_acc_data) +
+  tm_dots(col = "black", size = 0.05) +  # Adjust dot size using size = 0.05
+  tm_layout(title = "BMR Accident Locations (tmap)")
+
+
 ```
